@@ -2,8 +2,10 @@ name: Website Monitor
 
 on:
   schedule:
-    # Run every 5 minutes
+    # Run every 5 minutes for website monitoring
     - cron: '*/5 * * * *'
+    # Run daily at 7 AM UTC for test message
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 jobs:
@@ -41,7 +43,13 @@ jobs:
           }
           EOF
       
-      - name: Run website monitor
+      - name: Send Daily Test Message (7 AM UTC)
+        if: github.event.schedule == '0 7 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          python daily_test.py
+      
+      - name: Run Website Monitor (Every 5 minutes)
+        if: github.event.schedule == '*/5 * * * *'
         run: |
           python website_monitor.py &
           sleep 60

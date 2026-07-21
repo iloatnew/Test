@@ -6,6 +6,7 @@ Sends a daily test message via Telegram to verify the bot is working
 
 import requests
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -13,20 +14,23 @@ from pathlib import Path
 def send_daily_test_message():
     """Send daily test message to verify monitor is active"""
     
-    # Load config
-    config_file = Path('config.json')
-    if not config_file.exists():
-        print("Error: config.json not found")
-        return False
+    # Try to get credentials from environment variables first (GitHub Actions)
+    telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
+    telegram_chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-    
-    telegram_token = config.get('telegram_token')
-    telegram_chat_id = config.get('telegram_chat_id')
+    # If not in environment, try to load from config.json
+    if not telegram_token or not telegram_chat_id:
+        config_file = Path('config.json')
+        if config_file.exists():
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+            telegram_token = config.get('telegram_token')
+            telegram_chat_id = config.get('telegram_chat_id')
     
     if not telegram_token or not telegram_chat_id:
-        print("Error: Telegram credentials not configured")
+        print("❌ Error: Telegram credentials not configured")
+        print("   Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables")
+        print("   Or create config.json with telegram_token and telegram_chat_id")
         return False
     
     url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"

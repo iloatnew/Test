@@ -2,6 +2,7 @@
 """
 Website Monitor with Telegram Notifications
 Monitors a website for changes and sends alerts via Telegram
+Special detection for keywords like "aamon" (case-insensitive)
 """
 
 import requests
@@ -11,6 +12,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -90,7 +92,13 @@ class WebsiteMonitor:
             logger.error(f"Failed to send Telegram notification: {e}")
             return False
     
-    def check_website(self, site_name, site_url):
+    def check_for_keyword(self, content, keyword):
+        """Check if keyword appears in content (case-insensitive)"""
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        matches = pattern.findall(content)
+        return len(matches) > 0, len(matches)
+    
+    def check_website(self, site_name, site_url, check_keyword=None, extra_note=None):
         """Check if website content has changed"""
         content = self.fetch_website(site_url)
         if content is None:
@@ -110,6 +118,13 @@ class WebsiteMonitor:
             }
             self._save_state()
             logger.info(f"Started monitoring {site_name}")
+            
+            # Check for keyword on first run
+            if check_keyword:
+                found, count = self.check_for_keyword(content, check_keyword)
+                if found:
+                    logger.info(f"Keyword '{check_keyword}' found {count} time(s) on first check")
+            
             return False
         
         if current_hash != previous_hash:
@@ -127,6 +142,18 @@ class WebsiteMonitor:
                 f"<b>Time:</b> {timestamp}\n\n"
                 f"Content has been updated."
             )
+            
+            # Check for keyword in new content
+            if check_keyword:
+                found, count = self.check_for_keyword(content, check_keyword)
+                if found:
+                    message += (
+                        f"\n\n⚠️ <b>Keyword Alert!</b>\n"
+                        f"Found '<b>{check_keyword}</b>' {count} time(s) in the updated content.\n"
+                    )
+                    if extra_note:
+                        message += f"\n{extra_note}"
+            
             logger.info(f"Website {site_name} has changed!")
             self.send_telegram_notification(message)
             return True
@@ -153,12 +180,14 @@ class WebsiteMonitor:
                 for site in websites:
                     site_name = site.get('name')
                     site_url = site.get('url')
+                    check_keyword = site.get('check_for_keyword')
+                    extra_note = site.get('extra_note')
                     
                     if not site_name or not site_url:
                         logger.warning("Invalid site configuration")
                         continue
                     
-                    self.check_website(site_name, site_url)
+                    self.check_website(site_name, site_url, check_keyword, extra_note)
                 
                 logger.info(f"Sleeping for {check_interval} seconds...")
                 time.sleep(check_interval)

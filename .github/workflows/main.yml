@@ -43,7 +43,7 @@ jobs:
           }
           EOF
       
-      - name: Send Daily Test Message (7 AM UTC)
+      - name: Send Daily Test Message (7 AM UTC or Manual Trigger)
         if: github.event.schedule == '0 7 * * *' || github.event_name == 'workflow_dispatch'
         run: |
           python daily_test.py
